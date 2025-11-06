@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { DiscordIcon, HeartIcon, HeartIconSolid, PinIcon } from './icons';
 import type { User, Post } from '../types';
+import { useAuth } from '@/src/contexts/AuthContext';
 
 interface PostCardProps {
     post: Post;
@@ -85,16 +86,86 @@ const MemberListItem: React.FC<{ user: User }> = ({ user }) => (
     </div>
 );
 
-interface CommunityViewProps {
-    user: User;
-    posts: Post[];
-    handleLikeToggle: (postId: number) => void;
-    handlePinToggle: (postId: number) => void;
-    allUsers: User[];
-}
+const mockPosts: Post[] = [
+    {
+        id: 1,
+        author: 'R4 Academy',
+        avatar: 'https://i.pravatar.cc/150?u=admin',
+        time: 'há 2 horas',
+        content: 'Bem-vindo à comunidade R4 Academy! 🎉\n\nAqui você pode compartilhar suas criações, tirar dúvidas e conectar-se com outros membros.',
+        likes: 24,
+        liked: false,
+        pinned: true
+    },
+    {
+        id: 2,
+        author: 'Maria Silva',
+        avatar: 'https://i.pravatar.cc/150?u=maria',
+        time: 'há 5 horas',
+        content: 'Acabei de criar um vídeo incrível usando o gerador de vídeo! Os resultados ficaram muito melhores do que eu esperava.',
+        likes: 15,
+        liked: false,
+        pinned: false
+    },
+    {
+        id: 3,
+        author: 'João Santos',
+        avatar: 'https://i.pravatar.cc/150?u=joao',
+        time: 'há 1 dia',
+        content: 'Dica: Para melhores resultados com o gerador de imagens, sejam bem específicos nos prompts. Quanto mais detalhes, melhor! 💡',
+        likes: 31,
+        liked: true,
+        pinned: false
+    }
+];
 
-const CommunityView: React.FC<CommunityViewProps> = ({ user, posts, handleLikeToggle, handlePinToggle, allUsers }) => {
-    const admins = allUsers.filter(u => u.role === 'admin');
+const mockAdmins: User[] = [
+    {
+        name: 'R4 Academy',
+        email: 'admin@r4academy.com',
+        avatar: 'https://i.pravatar.cc/150?u=admin',
+        role: 'admin',
+        online: true
+    },
+    {
+        name: 'Suporte R4',
+        email: 'suporte@r4academy.com',
+        avatar: 'https://i.pravatar.cc/150?u=suporte',
+        role: 'admin',
+        online: false
+    }
+];
+
+const CommunityView: React.FC = () => {
+    const { user } = useAuth();
+    const [posts, setPosts] = useState<Post[]>(mockPosts);
+    
+    const handleLikeToggle = (postId: number) => {
+        setPosts(posts.map(post => 
+            post.id === postId 
+                ? { ...post, liked: !post.liked, likes: post.liked ? post.likes - 1 : post.likes + 1 }
+                : post
+        ));
+    };
+    
+    const handlePinToggle = (postId: number) => {
+        if (user?.role !== 'admin') return;
+        setPosts(posts.map(post => 
+            post.id === postId 
+                ? { ...post, pinned: !post.pinned }
+                : post
+        ));
+    };
+    
+    const currentUser: User = {
+        name: user?.name || 'Usuário',
+        email: user?.email || 'user@email.com',
+        avatar: 'https://i.pravatar.cc/150?u=' + user?.email,
+        role: (user?.role as 'admin' | 'user') || 'user',
+        online: true
+    };
+    
+    const admins = mockAdmins;
 
   return (
     <div className="animate-fade-in">
