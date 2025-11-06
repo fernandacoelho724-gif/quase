@@ -30,7 +30,8 @@ R4 Academy is a React-based AI application powered by Google Gemini. It provides
 ## Configuration
 
 ### Environment Variables
-- `GEMINI_API_KEY` - Google Gemini API key (configured in Replit Secrets)
+- `GOOGLE_API_KEY` - Google Gemini API key (configured in Replit Secrets)
+- `OPENAI_API_KEY` - OpenAI API key for GPT-4o (configured in Replit Secrets, used as fallback)
 - `CAKTO_PRODUCT_ID` - ID do produto Cakto para assinaturas (opcional)
 - `CAKTO_WEBHOOK_SECRET` - Segredo compartilhado para validar webhooks do Cakto
 - `VITE_API_URL` - URL base da API (opcional, padrão: `/api` com proxy)
@@ -75,6 +76,11 @@ npm run dev
   - Added OpenAI integration with GPT-4o chat agent
   - Implemented video progress persistence using localStorage
   - Now features dual AI chat: Google Gemini and OpenAI GPT
+  - **Secure AI Integration**: Moved API keys from frontend to backend (secure)
+  - **Automatic Fallback**: Chat uses Google Gemini first, automatically falls back to OpenAI if Google fails
+  - **Admin Role**: teste@gmail.com configured as admin in database
+  - **Backend Endpoints**: /api/ai/gemini-chat, /api/ai/chat-with-fallback, /api/ai/openai-chat
+  - **SSE Streaming**: Fixed streaming response parsing with proper buffer management
 
 ## Notes
 - This app was imported from AI Studio (https://ai.studio/apps/drive/16b5ElGbSprtdan1jbs4RNGAE78kxil0q)
