@@ -1,8 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ArrowLeftIcon, SendIcon } from '../icons';
-import { GoogleGenAI } from '@google/genai';
 import type { ChatMessage, ChatHistory } from '../../types';
-import type { Chat } from '@google/genai';
 import ChatHistorySidebar from '../ChatHistorySidebar';
 
 interface AgentProps {
@@ -24,7 +22,6 @@ const GeminiChatAgent: React.FC<AgentProps> = ({
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const chatRef = useRef<Chat | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     
     const messages = currentChat?.messages ?? [];
@@ -35,7 +32,6 @@ const GeminiChatAgent: React.FC<AgentProps> = ({
 
     const handleNewChat = () => {
         setCurrentChat(null);
-        chatRef.current = null;
         setInput('');
         setIsLoading(false);
         setError(null);
@@ -45,11 +41,6 @@ const GeminiChatAgent: React.FC<AgentProps> = ({
         const selected = chatHistories.find(c => c.id === id);
         if (selected) {
             setCurrentChat(selected);
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-            chatRef.current = ai.chats.create({
-                model: 'gemini-2.5-flash',
-                history: selected.messages,
-            });
         }
     };
 
@@ -76,28 +67,60 @@ const GeminiChatAgent: React.FC<AgentProps> = ({
         setCurrentChat(chatToUpdate);
         
         try {
-            if (!chatRef.current) {
-                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-                chatRef.current = ai.chats.create({ model: 'gemini-2.5-flash' });
-            }
+            const response = await fetch('/api/ai/chat-with-fallback', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                    message: currentInput,
+                    history: currentChat?.messages || []
+                })
+            });
 
-            const stream = await chatRef.current.sendMessageStream({ message: currentInput });
-            
+            if (!response.ok) throw new Error('Failed to get AI response');
+
             let modelResponseText = '';
             const modelMessage: ChatMessage = { role: 'model', parts: [{ text: '' }] };
             setCurrentChat(prev => ({...prev!, messages: [...prev!.messages, modelMessage]}));
 
-            for await (const chunk of stream) {
-                modelResponseText += chunk.text;
-                setCurrentChat(prev => {
-                    if (!prev) return prev;
-                    const updatedMessages = [...prev.messages];
-                    updatedMessages[updatedMessages.length - 1] = { ...modelMessage, parts: [{ text: modelResponseText }] };
-                    return { ...prev, messages: updatedMessages };
-                });
+            const reader = response.body?.getReader();
+            const decoder = new TextDecoder();
+
+            if (reader) {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6);
+                            if (data === '[DONE]') continue;
+
+                            try {
+                                const parsed = JSON.parse(data);
+                                modelResponseText += parsed.text;
+                                
+                                setCurrentChat(prev => {
+                                    if (!prev) return prev;
+                                    const updatedMessages = [...prev.messages];
+                                    updatedMessages[updatedMessages.length - 1] = { 
+                                        ...modelMessage, 
+                                        parts: [{ text: modelResponseText }] 
+                                    };
+                                    return { ...prev, messages: updatedMessages };
+                                });
+                            } catch (e) {
+                            }
+                        }
+                    }
+                }
             }
             
-            // Final save after stream completion
             saveChatHistory({
                 ...chatToUpdate,
                 messages: [...chatToUpdate.messages, { role: 'model', parts: [{ text: modelResponseText }] }],
@@ -106,7 +129,6 @@ const GeminiChatAgent: React.FC<AgentProps> = ({
         } catch (e) {
             console.error(e);
             setError('Ocorreu um erro ao comunicar com a IA. Tente novamente.');
-            // Revert user message on error
             setCurrentChat(prev => {
                 if(!prev) return null;
                 return {...prev, messages: prev.messages.slice(0, -1)};
